@@ -10,9 +10,9 @@ pipeline {
         stage('Build Stage') {
             steps {
                 sh '''
-                  docker --version
-                  docker build -t pyapp .
-                  docker save pyapp -o pyapp.tar
+                    docker --version
+                    docker build -t pyapp .
+                    docker save pyapp -o pyapp.tar
                 '''
             }
         }
@@ -24,16 +24,17 @@ pipeline {
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
-                sh '''
-                  docker load -i pyapp.tar
-                  docker run -d --name pythoncontainer -p 80:8080 pyapp || true
+                    sh '''
+                        docker load -i pyapp.tar
+                        docker rm -f pythoncontainer || true
+                        docker run -d --name pythoncontainer -p 80:8080 pyapp
 
-                  echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                  docker tag pyapp $DOCKER_USER/pyapp
-                  docker push $DOCKER_USER/pyapp
-                '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker tag pyapp $DOCKER_USER/pyapp
+                        docker push $DOCKER_USER/pyapp
+                    '''
+                }
             }
         }
     }
 }
-
