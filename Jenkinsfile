@@ -2,21 +2,33 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "pyapp"
+        // Docker
+        IMAGE_NAME     = "bansil374/pyapp"
+        CONTAINER_NAME = "pythoncontainer"
+
+        // Prod servers
+        PROD_SERVER1 = "3.111.35.233"
+        PROD_SERVER2 = "3.109.155.195"
     }
 
     stages {
 
-        stage('Build Stage') {
+        stage('Checkout Code') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build Docker Image') {
             steps {
                 sh '''
-                    docker --version
-                    docker build -t pyapp .
+                  docker --version
+                  docker build -t pyapp .
                 '''
             }
         }
 
-        stage('Docker Image Push') {
+        stage('Docker Login & Push') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-creds',
@@ -24,35 +36,48 @@ pipeline {
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
                     sh '''
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                        docker tag pyapp $DOCKER_USER/pyapp
-                        docker push $DOCKER_USER/pyapp
+                      echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                      docker tag pyapp $IMAGE_NAME
+                      docker push $IMAGE_NAME
                     '''
                 }
             }
-            
         }
 
-stage('Deploy Stage') {
-    steps {
-        sshagent(['prod-ssh-key']) {
-            sh '''
-                ssh -o StrictHostKeyChecking=no ubuntu@3.111.35.233 "
-                    docker stop pythoncontainer || true
-                    docker rm -f pythoncontainer || true
-                    docker pull $DOCKER_USER/pyapp
-                    docker run -d --name pythoncontainer -p 8081:8081 $DOCKER_USER/pyapp
-                "
+        stage('Deploy to Prod Servers') {
+            steps {
+                withCredentials([sshUserPrivateKey(
+                    credentialsId: 'prod-ssh-key',
+                    keyFileVariable: 'SSH_KEY',
+                    usernameVariable: 'SSH_USER'
+                )]) {
+                    sh '''
+                      for SERVER in $PROD_SERVER1 $PROD_SERVER2
+                      do
+                        echo "Deploying to $SERVER"
 
-                ssh -o StrictHostKeyChecking=no ubuntu@3.109.155.195 "
-                    docker stop pythoncontainer || true
-                    docker rm -f pythoncontainer || true
-                    docker pull $DOCKER_USER/pyapp
-                    docker run -d --name pythoncontainer -p 8081:8081 $DOCKER_USER/pyapp
-                "
-            '''
+                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY $SSH_USER@$SERVER "
+                          docker pull $IMAGE_NAME
+                          docker stop $CONTAINER_NAME || true
+                          docker rm -f $CONTAINER_NAME || true
+                          docker run -d \
+                            --name $CONTAINER_NAME \
+                            -p 8081:8081 \
+                            $IMAGE_NAME
+                        "
+                      done
+                    '''
+                }
+            }
         }
     }
-}
+
+    post {
+        success {
+            echo "✅ Deployment successful on all prod servers"
+        }
+        failure {
+            echo "❌ Deployment failed"
+        }
     }
 }
