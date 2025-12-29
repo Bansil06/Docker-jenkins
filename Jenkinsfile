@@ -7,8 +7,8 @@ pipeline {
         CONTAINER_NAME = "pythoncontainer"
 
         // Prod servers
-        PROD_SERVER1 = "3.111.35.233"
-        PROD_SERVER2 = "3.109.155.195"
+        PROD_SERVER1 = "3.108.55.149"
+        PROD_SERVER2 = "65.1.110.88"
     }
 
     stages {
