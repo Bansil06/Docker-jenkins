@@ -9,6 +9,7 @@ pipeline {
         // Prod servers
         PROD_SERVER1 = "3.108.55.149"
         PROD_SERVER2 = "65.1.110.88"
+        PROD_SERVER3 = "13.204.64.139"
     }
 
     stages {
